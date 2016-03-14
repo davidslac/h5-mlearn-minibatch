@@ -30,7 +30,7 @@ class H5MiniBatchReader(object):
                  class_labels_max_imbalance_ratio=None,
                  max_mb_to_preload_all=None,
                  random_seed=None,
-                 append_channel_to_2D=True,
+                 add_channel_to_2D=None, # can be "row_col_channel", or "channel_row_col"
                  verbose=False):
 
         if random_seed is not None:
@@ -52,7 +52,7 @@ class H5MiniBatchReader(object):
         self._feature_preprocess = feature_preprocess
         self._class_labels_max_imbalance_ratio = class_labels_max_imbalance_ratio
         self._max_mb_to_preload_all = max_mb_to_preload_all
-        self._append_channel_to_2D = append_channel_to_2D
+        self._add_channel_to_2D = add_channel_to_2D
         self._verbose = verbose
 
         if self._verbose:
@@ -126,7 +126,7 @@ class H5MiniBatchReader(object):
                                          samples=validation_samples, 
                                          h5files=self._h5files, 
                                          preprocess=self._feature_preprocess,
-                                         append_channel_to_2D=self._append_channel_to_2D,
+                                         add_channel_to_2D=self._add_channel_to_2D,
                                          one_hot_num_outputs=self._one_hot_arg)
         else:
             self._validation_features = None
@@ -145,7 +145,7 @@ class H5MiniBatchReader(object):
                                                 samples=self._train_samples[0:1,:],
                                                 h5files=self._h5files,
                                                 preprocess=None,
-                                                append_channel_to_2D=self._append_channel_to_2D,
+                                                add_channel_to_2D=self._add_channel_to_2D,
                                                 one_hot_num_outputs=None)
         self._features_shape = feats.shape[1:]
 
@@ -165,7 +165,7 @@ class H5MiniBatchReader(object):
                                                         samples=self._train_samples,
                                                         h5files=self._h5files, 
                                                         preprocess=self._feature_preprocess,
-                                                        append_channel_to_2D=True,
+                                                        add_channel_to_2D=self._add_channel_to_2D,
                                                         one_hot_num_outputs=self._one_hot_arg)
             return SamplesCache(self._train_samples, features, labels)
         if max_mb_to_preload_all > 0 and verbose:
@@ -204,7 +204,7 @@ class H5MiniBatchReader(object):
                                                     samples=samples_to_load, 
                                                     h5files=self._h5files, 
                                                     preprocess=self._feature_preprocess,
-                                                    append_channel_to_2D=self._append_channel_to_2D,
+                                                    add_channel_to_2D=self._add_channel_to_2D,
                                                     one_hot_num_outputs=self._one_hot_arg)
         return features, labels
 
@@ -216,6 +216,6 @@ class H5MiniBatchReader(object):
                                                     samples=self._train_samples,
                                                     h5files=self._h5files, 
                                                     preprocess=self._feature_preprocess,
-                                                    append_channel_to_2D=self._append_channel_to_2D,
+                                                    add_channel_to_2D=self._add_channel_to_2D,
                                                     one_hot_num_outputs=self._one_hot_arg)
         return features, labels

@@ -93,41 +93,49 @@ def load_features_and_labels(dataset,
                              samples, 
                              h5files, 
                              preprocess=None,
-                             append_channel_to_2D=True,
+                             add_channel_to_2D=None,
                              one_hot_num_outputs=None):
     '''returns features, labels
     ARGS
       samples - 2D integer array with 3 columns:
     fileIdx, row, label
     fileIdx is an index into the list of files h5
-    
-    
     '''
     ############# helper functions
-    def get_features_shape(ds, append_channel_to_2D):
+    def get_features_shape(ds, add_channel_to_2D):
         assert len(ds.shape)<4, "do not support 4d or higher featuresets"
         if len(ds.shape) == 1:
             features_shape = (len(samples),)
         elif len(ds.shape) == 2:
             features_shape = (len(samples), ds.shape[1])
         elif len(ds.shape)==3:
-            if append_channel_to_2D:
+            if add_channel_to_2D == 'row_column_channel':
                 features_shape = (len(samples), ds.shape[1], ds.shape[2], 1)
+            elif add_channel_to_2D == 'channel_row_column':
+                features_shape = (len(samples), 1, ds.shape[1], ds.shape[2])
+
             else:
                 features_shape = (len(samples), ds.shape[1], ds.shape[2])
         elif len(ds.shape)==4:
                 features_shape = (len(samples), ds.shape[1], ds.shape[2], ds.shape[3])
         return features_shape
 
-    def copy_samples(ds, read_from, features, store_at):
+    def copy_samples(ds, read_from, features, store_at, add_channel_to_2D):
         if len(features.shape)==1:
             features[store_at] = ds[read_from]
         elif len(features.shape)==4 and len(ds.shape)==3:
             # images, where we add one channel to features
-            features[store_at,:,:,0] = ds[read_from,:]
+            if add_channel_to_2D == 'row_column_channel':
+                features[store_at,:,:,0] = ds[read_from,:]
+            elif add_channel_to_2D == 'channel_row_column':
+                features[store_at,0,:,:] = ds[read_from,:]
+            else:
+                raise Exception("copying from 3D to 4D, but add_channel_to_2D not 'row_column_channel' or 'channel_row_column', it is %s" % add_channel_to_2D)
         else:
             features[store_at,:] = ds[read_from,:]
-    ######### end helpers
+
+    ######### end helpers                                    
+    assert add_channel_to_2D in [None, 'row_column_channel', 'channel_row_column'], "add_channel_to_2D is %s" % add_channel_to_2D
     if preprocess is None:
         preprocess = []
     assert isinstance(preprocess, list) or isinstance(preprocess, tuple), 'preprocess must be None, or a list of strings'
@@ -140,7 +148,7 @@ def load_features_and_labels(dataset,
         labels = samples[:,2].astype(np.int32)
 
     features_shape = get_features_shape(h5py.File(h5files[0],'r')[dataset], 
-                                        append_channel_to_2D)
+                                        add_channel_to_2D)
     features = np.zeros(features_shape, dtype=np.float32)
     
     file_idx_2_read_store = {}
@@ -159,7 +167,7 @@ def load_features_and_labels(dataset,
         store_at = store_at[argsort_read_from]
         h5file = h5files[file_idx]
         h5 = h5py.File(h5file, 'r')
-        copy_samples(h5[dataset], read_from, features, store_at)
+        copy_samples(h5[dataset], read_from, features, store_at, add_channel_to_2D)
 
     for step in preprocess:
         if step == 'log':
