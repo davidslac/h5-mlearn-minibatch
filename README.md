@@ -4,10 +4,10 @@ package to prepare minibatches from h5 input for a machine learning framework.
 
 The intent is to handle a collection of hdf5 files that have a relatively flat 
 schema. Something like
-
+```
    /features
    /labels
-
+```
 The class H5MiniBatchReader will read first through these files and identify
 the samples and labels, and imbalances in the classes (i.e, there are more 
 samples labeled 0 then labeled 1). The class provides options to restrict the
