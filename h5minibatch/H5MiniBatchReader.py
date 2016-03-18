@@ -28,7 +28,7 @@ class H5MiniBatchReader(object):
                  number_of_batches=None,
                  feature_preprocess=None,
                  class_labels_max_imbalance_ratio=None,
-                 max_mb_to_preload_all=None,
+                 max_mb_to_preload_all=None,  # can be numeric
                  random_seed=None,
                  add_channel_to_2D=None, # can be "row_col_channel", or "channel_row_col"
                  verbose=False):
@@ -148,12 +148,13 @@ class H5MiniBatchReader(object):
                                                 add_channel_to_2D=self._add_channel_to_2D,
                                                 one_hot_num_outputs=None)
         self._features_shape = feats.shape[1:]
+        self._features_dtype = feats.dtype
 
 
     def _try_to_preload_training(self, max_mb_to_preload_all, verbose):
         if not max_mb_to_preload_all:
             return None
-
+            
         bytesPerPreprocessedPixel = 4.0
         mbToStoreTrain = bytesPerPreprocessedPixel
         for rnk in self._features_shape:
@@ -161,12 +162,17 @@ class H5MiniBatchReader(object):
         mbToStoreTrain *= len(self._train_samples)
         mbToStoreTrain /= float(1<<20)
         if mbToStoreTrain < max_mb_to_preload_all:
+            t0 = time.time()
+            sys.stdout.write("starting to preload %.2fMB of data ...\n" % mbToStoreTrain)
+            sys.stdout.flush()
             features, labels = load_features_and_labels(dataset=self._feature_dataset,
                                                         samples=self._train_samples,
                                                         h5files=self._h5files, 
                                                         preprocess=self._feature_preprocess,
                                                         add_channel_to_2D=self._add_channel_to_2D,
                                                         one_hot_num_outputs=self._one_hot_arg)
+            sys.stdout.write("preloading data took %.2f sec.\n" % (time.time()-t0,))
+            sys.stdout.flush()
             return SamplesCache(self._train_samples, features, labels)
         if max_mb_to_preload_all > 0 and verbose:
             print("Did not preload training. Needed %.2f MB, but limit was %.2f" % 
