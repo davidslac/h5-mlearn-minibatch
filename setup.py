@@ -11,7 +11,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='h5-mlearn-minibatch',
-    version='0.0.1',
+    version='0.0.2',
     description='package to prepare minibatches from h5 input for a machine learning framework.',
     long_description=long_description,
     url='https://github.com/davidslac/h5-mlearn-minibatch',
