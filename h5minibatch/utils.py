@@ -102,7 +102,7 @@ def load_features_and_labels(dataset,
     fileIdx is an index into the list of files h5
     '''
     ############# helper functions
-    def get_features_shape(ds, add_channel_to_2D):
+    def get_features_shape_and_dtype(ds, add_channel_to_2D):
         assert len(ds.shape)<4, "do not support 4d or higher featuresets"
         if len(ds.shape) == 1:
             features_shape = (len(samples),)
@@ -118,7 +118,7 @@ def load_features_and_labels(dataset,
                 features_shape = (len(samples), ds.shape[1], ds.shape[2])
         elif len(ds.shape)==4:
                 features_shape = (len(samples), ds.shape[1], ds.shape[2], ds.shape[3])
-        return features_shape
+        return features_shape, ds.dtype
 
     def copy_samples(ds, read_from, features, store_at, add_channel_to_2D):
         if len(features.shape)==1:
@@ -140,16 +140,16 @@ def load_features_and_labels(dataset,
         preprocess = []
     assert isinstance(preprocess, list) or isinstance(preprocess, tuple), 'preprocess must be None, or a list of strings'
     for step in preprocess:
-        assert step in ['mean', 'log']
+        assert step in ['mean', 'log', 'float32', 'float64']
 
     if one_hot_num_outputs:
         labels = convert_to_one_hot(samples[:,2], one_hot_num_outputs)
     else:
         labels = samples[:,2].astype(np.int32)
 
-    features_shape = get_features_shape(h5py.File(h5files[0],'r')[dataset], 
-                                        add_channel_to_2D)
-    features = np.zeros(features_shape, dtype=np.float32)
+    features_shape, features_dtype = get_features_shape_and_dtype(h5py.File(h5files[0],'r')[dataset], 
+                                                                  add_channel_to_2D)
+    features = np.zeros(features_shape, dtype=features_dtype)
     
     file_idx_2_read_store = {}
     for feature_row, sample_row in enumerate(samples):
@@ -169,11 +169,27 @@ def load_features_and_labels(dataset,
         h5 = h5py.File(h5file, 'r')
         copy_samples(h5[dataset], read_from, features, store_at, add_channel_to_2D)
 
-    for step in preprocess:
-        if step == 'log':
-            features[features < 1.0]=1.0
-            features = np.log(features)
-        if step == 'mean':
-            mean = np.mean(features, axis=0)
-            features -= mean
+    features = apply_preprocess_steps(features, preprocess)
     return features, labels
+
+def apply_preprocess_steps(arr, preprocess_steps):
+    '''This can be descructive to the array passed in, but still use as
+    arr = apply_preprocess(arr,['log', 'mean'])
+    '''
+    if preprocess_steps is None:
+        return arr
+    for step in preprocess_steps:
+        assert step in ['float32', 'float64', 'log', 'mean']
+        if (step in ['log','mean']) and (not np.issubdtype(arr.dtype, np.float)):
+            arr = arr.astype(np.float32)
+        if step == 'float32':
+            arr = arr.astype(np.float32)
+        elif step == 'float64':
+            arr = arr.astype(np.float64)
+        elif step == 'log':
+            arr[arr < 1.0]=1.0
+            arr = np.log(arr)
+        elif step == 'mean':
+            mean = np.mean(arr, axis=0)
+            arr -= mean
+    return arr

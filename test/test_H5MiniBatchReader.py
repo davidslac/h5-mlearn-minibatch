@@ -11,6 +11,61 @@ import h5py
 
 from h5minibatch.H5MiniBatchReader import H5MiniBatchReader
 
+class TestRaw( unittest.TestCase ) :
+    def setUp(self):
+        self.h5filename = 'unitest_' + uuid.uuid4().hex + '.h5'
+        h5 = h5py.File(self.h5filename,'w')
+        img_features = np.zeros((100,2,3),np.int16)
+        img_features += 10
+        img_labels = np.zeros(100, np.int32)
+        h5['features']=img_features
+        h5['labels']=img_labels
+        h5.close()
+
+    def tearDown(self):
+        os.unlink(self.h5filename)
+
+    def testHaveRaw(self):
+        miniBatchReader = H5MiniBatchReader(h5files=[self.h5filename],
+                                            minibatch_size=2,
+                                            validation_size=2,
+                                            feature_preprocess=None,
+                                            verbose=True)
+        train_feats, train_labels = miniBatchReader.get_all_train()
+        validation_feats, validation_labels = miniBatchReader.get_validation_set()
+        miniBatch_feats, miniBatch_labels = miniBatchReader.get_next_minibatch()
+        assert train_feats.dtype == np.int16, "dtype is not int16, it is %r" % train_feats.dtype
+        assert validation_feats.dtype == np.int16, "dtype is not int16, it is %r" % validation_feats.dtype
+        assert miniBatch_feats.dtype == np.int16, "dtype is not int16, it is %r" % miniBatch_feats.dtype
+
+    def testCacheRaw(self):
+        miniBatchReader = H5MiniBatchReader(h5files=[self.h5filename],
+                                            minibatch_size=2,
+                                            validation_size=0,
+                                            feature_preprocess=['mean'],
+                                            max_mb_to_preload_all=100000,
+                                            verbose=True)
+        assert miniBatchReader._train_samples_cache._features.dtype == np.int16
+        feats, labels = miniBatchReader.get_next_minibatch()
+        assert feats.dtype == np.float32
+        assert abs(feats[0,0,0])<.1, "preprocess has subtract mean, but feats[0,0,0]==%.2f" % feats[0,0,0]
+
+    def testCacheProcessed(self):
+        miniBatchReader = H5MiniBatchReader(h5files=[self.h5filename],
+                                            minibatch_size=2,
+                                            validation_size=0,
+                                            feature_preprocess=['mean'],
+                                            max_mb_to_preload_all=100000,
+                                            cache_preprocess=True,
+                                            verbose=True)
+        assert miniBatchReader._train_samples_cache._features.dtype == np.float32
+        feats, labels = miniBatchReader.get_next_minibatch()
+        assert feats.dtype == np.float32
+        assert feats.dtype == np.float32
+        assert abs(feats[0,0,0])<.1, "preprocess has subtract mean, but feats[0,0,0]==%.2f" % feats[0,0,0]
+
+
+
 class TestReadEpochs( unittest.TestCase ) :
 
     def setUp(self) :

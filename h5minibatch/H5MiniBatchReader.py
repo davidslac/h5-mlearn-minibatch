@@ -13,6 +13,7 @@ from .SamplesCache import SamplesCache
 from .utils import get_all_samples
 from .utils import get_balanced_samples
 from .utils import load_features_and_labels
+from .utils import apply_preprocess_steps
 
 
 class H5MiniBatchReader(object):
@@ -29,12 +30,16 @@ class H5MiniBatchReader(object):
                  feature_preprocess=None,
                  class_labels_max_imbalance_ratio=None,
                  max_mb_to_preload_all=None,  # can be numeric
+                 cache_preprocess=False,
                  random_seed=None,
                  add_channel_to_2D=None, # can be "row_col_channel", or "channel_row_col"
                  verbose=False):
 
         if random_seed is not None:
             np.random.seed(random_seed)
+            if verbose:
+                print("H5MiniBatchReader: set random_seed to %r" % random_seed)
+
         _h5files = copy.deepcopy(h5files)
         original_len_h5files = len(_h5files)
         _h5files = list(set(_h5files))
@@ -42,6 +47,7 @@ class H5MiniBatchReader(object):
             warnings.warn("H5MiniBatchReader: duplicate filenames "
                           "given in h5files argument - uniqifying")
         _h5files.sort()
+
         self._h5files = _h5files
         self._minibatch_size = minibatch_size
         self._validation_size = validation_size
@@ -52,6 +58,7 @@ class H5MiniBatchReader(object):
         self._feature_preprocess = feature_preprocess
         self._class_labels_max_imbalance_ratio = class_labels_max_imbalance_ratio
         self._max_mb_to_preload_all = max_mb_to_preload_all
+        self._cache_preprocess = cache_preprocess
         self._add_channel_to_2D = add_channel_to_2D
         self._verbose = verbose
 
@@ -138,37 +145,49 @@ class H5MiniBatchReader(object):
             sys.stdout.flush()
 
         self._train_samples_cache = self._try_to_preload_training(self._max_mb_to_preload_all,
-                                                                 self._verbose)
+                                                                  self._cache_preprocess,
+                                                                  self._verbose)
 
     def _set_features_shape(self):
-        feats, labels =load_features_and_labels(dataset=self._feature_dataset,
-                                                samples=self._train_samples[0:1,:],
-                                                h5files=self._h5files,
-                                                preprocess=None,
-                                                add_channel_to_2D=self._add_channel_to_2D,
-                                                one_hot_num_outputs=None)
+        feats, labels = load_features_and_labels(dataset=self._feature_dataset,
+                                                 samples=self._train_samples[0:1,:],
+                                                 h5files=self._h5files,
+                                                 preprocess=None,
+                                                 add_channel_to_2D=self._add_channel_to_2D,
+                                                 one_hot_num_outputs=None)
         self._features_shape = feats.shape[1:]
-        self._features_dtype = feats.dtype
 
-
-    def _try_to_preload_training(self, max_mb_to_preload_all, verbose):
+    def _try_to_preload_training(self, max_mb_to_preload_all, cache_preprocess, verbose):
         if not max_mb_to_preload_all:
             return None
-            
-        bytesPerPreprocessedPixel = 4.0
-        mbToStoreTrain = bytesPerPreprocessedPixel
+        
+        if cache_preprocess:
+            preprocess_steps = self._feature_preprocess
+        else:
+            preprocess_steps = None
+
+        one_feat,l = load_features_and_labels(dataset=self._feature_dataset,
+                                              samples=self._train_samples[0:1],
+                                              h5files=self._h5files, 
+                                              preprocess=preprocess_steps,
+                                              add_channel_to_2D=self._add_channel_to_2D,
+                                              one_hot_num_outputs=self._one_hot_arg)
+
+        bytesPerElem = one_feat.dtype.itemsize
+        mbToStoreTrain = bytesPerElem
         for rnk in self._features_shape:
             mbToStoreTrain *= rnk
         mbToStoreTrain *= len(self._train_samples)
         mbToStoreTrain /= float(1<<20)
         if mbToStoreTrain < max_mb_to_preload_all:
             t0 = time.time()
-            sys.stdout.write("starting to preload %.2fMB of data ...\n" % mbToStoreTrain)
+            sys.stdout.write("starting to preload %.2fMB of data. preprocess steps=%r ...\n" % 
+                             (mbToStoreTrain, preprocess_steps))
             sys.stdout.flush()
             features, labels = load_features_and_labels(dataset=self._feature_dataset,
                                                         samples=self._train_samples,
                                                         h5files=self._h5files, 
-                                                        preprocess=self._feature_preprocess,
+                                                        preprocess=preprocess_steps,
                                                         add_channel_to_2D=self._add_channel_to_2D,
                                                         one_hot_num_outputs=self._one_hot_arg)
             sys.stdout.write("preloading data took %.2f sec.\n" % (time.time()-t0,))
@@ -204,8 +223,11 @@ class H5MiniBatchReader(object):
 
     def _load_features_check_cache(self, samples_to_load):
         if self._train_samples_cache:
-            return self._train_samples_cache.get_samples(samples_to_load)
-            
+            features, labels = self._train_samples_cache.get_samples(samples_to_load)
+            if not self._cache_preprocess:
+                features = apply_preprocess_steps(features, self._feature_preprocess)
+            return features, labels
+
         features, labels = load_features_and_labels(dataset=self._feature_dataset,
                                                     samples=samples_to_load, 
                                                     h5files=self._h5files, 

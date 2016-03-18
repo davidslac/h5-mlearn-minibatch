@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import numpy as np
 
+import pdb
+
 class SamplesCache(object):
     def __init__(self, samples, features, labels):
         '''maintain cache of samples.
@@ -43,8 +45,14 @@ class SamplesCache(object):
         for file_index, row, label in samples:
             cache_index, stored_label = self._samples_dict[(file_index,row)]
             assert label == stored_label
-            features[store_index,:] = self._features[cache_index,:]
-            labels[store_index,:] = self._labels[cache_index,:]
+            if len(features.shape)> 1:
+                features[store_index,:] = self._features[cache_index,:]
+            else:
+                features[store_index] = self._features[cache_index]
+            if len(labels.shape)>1:
+                labels[store_index,:] = self._labels[cache_index,:]
+            else:
+                labels[store_index] = self._labels[cache_index]
             all_cache_idx.append(cache_index)
             store_index += 1
         assert len(set(all_cache_idx))==len(samples)
