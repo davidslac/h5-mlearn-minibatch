@@ -77,13 +77,8 @@ class H5MiniBatchReader(object):
         if self._class_labels_max_imbalance_ratio is not None:
             balanced_samples = get_balanced_samples(all_samples, 
                                                     self._num_outputs, 
-                                                    self._class_labels_max_imbalance_ratio)
-            if self._verbose:
-                sys.stdout.write(("After balancing samples per ratio=%.2f, " + \
-                                 "there are %d samples available for train/validation\n") % \
-                                 (self._class_labels_max_imbalance_ratio,
-                                  len(balanced_samples)))
-                sys.stdout.flush()
+                                                    self._class_labels_max_imbalance_ratio,
+                                                    self._verbose)
             # balancing produces samples grouped by label. randomize before we 
             # grab validation set
             np.random.shuffle(balanced_samples)
@@ -147,6 +142,9 @@ class H5MiniBatchReader(object):
         self._train_samples_cache = self._try_to_preload_training(self._max_mb_to_preload_all,
                                                                   self._cache_preprocess,
                                                                   self._verbose)
+
+    def batches_per_epoch(self):
+        return self._number_of_batches
 
     def _set_features_shape(self):
         feats, labels = load_features_and_labels(dataset=self._feature_dataset,

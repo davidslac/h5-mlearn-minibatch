@@ -49,7 +49,7 @@ def get_all_samples(h5files, h5label, verbose=False):
     return all_samples
 
 
-def get_balanced_samples(samples, num_outputs, class_labels_max_imbalance_ratio):
+def get_balanced_samples(samples, num_outputs, class_labels_max_imbalance_ratio, verbose=False):
     '''takes matrix with 3 columns, file_idx, sample_idx, label
     returns a matrix that is a selection of those rows, with
     numSamples rows. There should be an equal amount of each 
@@ -57,16 +57,15 @@ def get_balanced_samples(samples, num_outputs, class_labels_max_imbalance_ratio)
     '''
     assert class_labels_max_imbalance_ratio > 0.0
     if class_labels_max_imbalance_ratio < 1.0:
-        class_labels_max_imbalance_ratio /= 1.0
+        class_labels_max_imbalance_ratio = (1.0 / class_labels_max_imbalance_ratio)
     assert class_labels_max_imbalance_ratio >= 1.0
 
     label2rows = {}
     min_samples_in_a_label = len(samples)
-    max_samples_in_a_label = 0
     for label in range(num_outputs):
         label2rows[label] = np.where(samples[:,2]==label)[0]
         min_samples_in_a_label = min(min_samples_in_a_label, len(label2rows[label]))
-        max_samples_in_a_label = max(max_samples_in_a_label, len(label2rows[label]))
+
     max_labels_per_class_to_balance = int(round(min_samples_in_a_label * class_labels_max_imbalance_ratio))
 
     balanced_samples = np.zeros((0,3), dtype=np.int32)
@@ -77,7 +76,16 @@ def get_balanced_samples(samples, num_outputs, class_labels_max_imbalance_ratio)
     as_set = set([tuple([a,b,c]) for a,b,c in balanced_samples])
     assert len(as_set)==len(balanced_samples), "number of balanced samples=%d != unique #=%d" % \
         (len(balanced_samples),len(as_set))
-
+    
+    if verbose:
+        print("After balancing per ratio %.2f, there are %d examples" % (class_labels_max_imbalance_ratio, len(balanced_samples)))
+        count_in_largest_class = 0
+        for label in range(num_outputs):
+            num_this_label = sum(balanced_samples[:,2]==label)
+            count_in_largest_class=max(count_in_largest_class,num_this_label)
+            percent_this_label = 100.0 * num_this_label / len(balanced_samples)
+            print("   label=%3d   %8d examples  (%5.1f%% of dataset)" % (label, num_this_label, percent_this_label))
+        print("classifier that always picks label for largest class performs at: %.1f%%" % ((count_in_largest_class/len(balanced_samples))*100.0,))
     return balanced_samples
 
 
