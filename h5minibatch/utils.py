@@ -5,49 +5,25 @@ from __future__ import print_function
 import numpy as np
 import h5py
 
-def get_all_samples(h5files, h5label, verbose=False):
-    '''returns a 2D numpy array, columns are fileIdx, sampleIdx,  label
-    ARGS
-      h5files - list of h5 files
-      h5label - possibly used to calculate labels depending on dataset value
-    '''
-    all_samples = np.zeros((0,3), np.int32)
-    total_in_files = 0
-    assert len(h5files)==len(set(h5files)), "h5files are not distinct"
-    for file_index, h5file in enumerate(h5files):
-        h5 = h5py.File(h5file,'r')
-        assert h5label in h5.keys(), "label dataset: %s not in h5 file: %s" % \
-            (h5label, h5file)
-        values = h5[h5label][:]
-        total_in_files += len(values)
-        assert np.issubdtype(values.dtype, np.integer), "label dataset is not integral. " \
-            "Currently only support integral labels for class categories."
-        assert len(values.shape)==1, "label dataset is not 1 dimensional."
-        labeled_samples = values >= 0
-        labels = values[labeled_samples]
-        rows = np.where(labeled_samples==1)[0]
-        samples = np.zeros((len(labels), 3), np.int32)
-        samples[:,2] = labels[:]
-        samples[:,1] = rows[:]
-        samples[:,0] = file_index
-        all_samples = np.vstack((all_samples, samples))
-    total_in_dataset = len(all_samples)
-    label2samples = {}
-    num_labels = np.max(all_samples[:,2])+1
-    if verbose:
-        print("total of %d samples in %d files, %d for this dataset (%.0f%%)" % 
-              (total_in_files, len(h5files), total_in_dataset, 
-               100.0*total_in_dataset/total_in_files))
-        for label in range(num_labels):
-            label_samples = np.sum(all_samples[:,2]==label)
-            print("  label=%3d has %d samples (%.0f%%)" % 
-                  (label, label_samples, 100.0*label_samples/total_in_dataset))
 
-    as_set = set([tuple([a,b,c]) for a,b,c in all_samples])
-    assert len(as_set)==len(all_samples)
+def makeMask(h5, exclude_if_negone_mask_datasets=[], include_if_one_mask_datasets=[]):
+    mask = None
 
-    return all_samples
+    for maskList, maskVal in zip([exclude_if_negone_mask_datasets,
+                                  include_if_one_mask_datasets],
+                                 [-1, 1]):
+        for dsname in maskList:
+            assert dsname in h5.keys(), "masking dataset: %s not in h5file" % dsname
+            curmask = h5[dsname][:] == maskVal
+            if maskVal == -1:
+                curmask = np.logical_not(curmask)
+            if mask is None:
+                mask = curmask
+            else:
+                mask = np.logical_and(mask, curmask)
 
+    return mask
+        
 
 def get_balanced_samples(samples, num_outputs, class_labels_max_imbalance_ratio, verbose=False):
     '''takes matrix with 3 columns, file_idx, sample_idx, label
