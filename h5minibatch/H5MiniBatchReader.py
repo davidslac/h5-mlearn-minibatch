@@ -74,7 +74,7 @@ class H5MiniBatchReader(object):
                           verbose=self._verbose)
 
         samples.shuffle()
-        sampleList = samples.split([validation_size_percent, test_size_percent], self._minibatch_size)
+        sampleList = samples.split([test_size_percent, validation_size_percent], self._minibatch_size)
         self.samples = {}
         self.samples['test'], self.samples['validation'], self.samples['train'] = sampleList
 
