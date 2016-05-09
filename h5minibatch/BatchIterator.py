@@ -6,13 +6,17 @@ import time
 import numpy as np
 import h5py
 
+from .FvecPreprocess import preprocessFvecBatch
+
 class BatchIterator(object):
     def __init__(self,
                  samples,
                  epochs,
                  batchLimit,
                  batchsize,
-                 datasets):
+                 datasets,
+                 fvec_whitten=False,
+                 fvec_whitten_stats=None):
         
         assert samples.totalSamples % batchsize == 0
         self.totalEpochs=epochs
@@ -20,12 +24,13 @@ class BatchIterator(object):
         self.batchsize=batchsize
         self.samples=samples
         self.datasets=datasets
+        self.fvec_whitten = fvec_whitten
+        self.fvec_whitten_stats = fvec_whitten_stats
 
         self.curEpoch=0
         self.nextSampleIdx=0
         self.batchesPerEpoch = self.samples.totalSamples//self.batchsize
         
-        self.TIMEOUT = 120
         h5 = h5py.File(self.samples.h5files[0], 'r')
         
         self.batchDatasets = {}
@@ -48,9 +53,13 @@ class BatchIterator(object):
         if self.batchLimit and self.batchLimit <= self.nextSampleIdx//self.batchsize:
             raise StopIteration()
 
+        fvec = self.samples.allFeatureVector[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)]
+        if self.fvec_whitten:
+            fvec = preprocessFvecBatch(fvec, self.fvec_whitten_stats, self.samples.fvec_datasets)
+
         batchDict = {'epoch':self.curEpoch,
                      'batch':self.nextSampleIdx//self.batchsize,
-                     'fvecs':self.samples.allFeatureVector[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)],
+                     'fvec':fvec,
                      'labels':self.samples.allLabels[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)],
                      'filesRows':self.samples.allSamples[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)],
                      'readtime':self._batchReadTime,

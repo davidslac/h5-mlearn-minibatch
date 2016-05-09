@@ -5,6 +5,21 @@ from __future__ import print_function
 import numpy as np
 import h5py
 
+_str2np = {'float32':np.float32,
+           'float64':np.float64,
+           'int8':np.int8,
+           'int16':np.int16,
+           'int32':np.int32,
+           'int64':np.int64,
+           'int8':np.int8,
+           'uint16':np.uint16,
+           'uint32':np.uint32,
+           'uint64':np.uint64}
+
+def str2np_dtype(dtypestr):
+    global _str2np
+    assert dtypestr in _str2np
+    return _str2np[dtypestr]
 
 def makeMask(h5, exclude_if_negone_mask_datasets=[], include_if_one_mask_datasets=[]):
     mask = None

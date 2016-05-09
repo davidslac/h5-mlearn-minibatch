@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import sys
+import os
 import copy
 import time
 import warnings
@@ -10,9 +11,10 @@ import warnings
 import numpy as np
 import h5py
 
-from .utils import makeMask
+from .utils import makeMask, str2np_dtype
 from .Samples import Samples
 from .BatchIterator import BatchIterator
+from .FvecPreprocess import loadFvecStats
 
 class H5MiniBatchReader(object):
     '''delivers minibatches of feature/labels from a collection of h5 files
@@ -43,22 +45,29 @@ class H5MiniBatchReader(object):
         '''keys in the h5 files'''
         return h5py.File(self._h5files[0],'r').keys()
 
-    def prepareClassification(self,
-                              label_dataset,
-                              datasets_for_feature_vector=[],
-                              feature_vector_dtype = np.float32,
-                              feature_image_datasets=[],
-                              minibatch_size=64,
-                              validation_size_percent=0.05,                
-                              test_size_percent=0.05,
-                              random_seed=None):
+    def initClassify(self,
+                     label_dataset,
+                     datasets_for_feature_vector=[],
+                     feature_image_datasets=[],
+                     fvec_whitten=False,
+                     fvec_whitten_fname=None,
+                     fvec_dtype = 'float32',
+                     minibatch_size=64,
+                     validation_size_fraction=0.05,                
+                     test_size_fraction=0.05,
+                     random_seed=None):
 
         self._label_dataset = label_dataset
         self._datasets_for_feature_vector = datasets_for_feature_vector
         self._feature_image_datasets = feature_image_datasets
+        self._fvec_whitten = fvec_whitten
+        self._fvec_whitten_fname = fvec_whitten_fname
+        self._fvec_dtype = str2np_dtype(fvec_dtype)
         self._minibatch_size = minibatch_size
-        self._validation_size_percent = validation_size_percent
-        self._test_size_percent = test_size_percent
+        self._validation_size_fraction = validation_size_fraction
+        self._test_size_fraction = test_size_fraction
+
+        self._fvec_whitten_stats = None
 
         if random_seed is not None:
             np.random.seed(random_seed)
@@ -68,27 +77,47 @@ class H5MiniBatchReader(object):
         samples = Samples(h5files=self._h5files,
                           label_dataset=self._label_dataset,
                           fvec_datasets=self._datasets_for_feature_vector,
-                          fvec_dtype=feature_vector_dtype,
+                          fvec_dtype=self._fvec_dtype,
                           include_if_one_mask_datasets=self._include_if_one_mask_datasets,
                           exclude_if_negone_mask_datasets=self._exclude_if_negone_mask_datasets,
                           verbose=self._verbose)
 
         samples.shuffle()
-        sampleList = samples.split([test_size_percent, validation_size_percent], self._minibatch_size)
+        sampleList = samples.split([test_size_fraction, validation_size_fraction], self._minibatch_size)
         self.samples = {}
         self.samples['test'], self.samples['validation'], self.samples['train'] = sampleList
 
+        if self._fvec_whitten:
+            if not os.path.exists(self._fvec_whitten_fname):
+                self.samples['train'].fvecStats(self._verbose, 
+                                                self._fvec_whitten_fname)
+            self._fvec_whitten_stats = loadFvecStats(self._fvec_whitten_fname)
+                                                            
+    def image_dataset_shapes(self):
+        shapes = {}
+        for nm in self._feature_image_datasets:
+            shapes[nm] = h5py.File(self._h5files[0], 'r')[nm].shape[1:]
+        return shapes
+
+    def datasets_for_feature_vector(self):
+        return self._datasets_for_feature_vector
+
     def numSamples(self, partition):
         return self.samples[partition].totalSamples
-            
+
+    def numOutputs(self):
+        return 1+max([self.samples[partition].numOutputs() for partition in 
+                      ['test','validation','train']])
+
     def numBatchesPerEpoch(self, partition):
         return self.samples[partition].totalSamples // self._minibatch_size
-        
 
-    def batchIterator(self, partition, epochs, batchLimit=None):
+    def batchIterator(self, partition, epochs=None, batchLimit=None):
         return BatchIterator(samples=self.samples[partition],
                              epochs=epochs,
                              batchLimit=batchLimit,
                              batchsize = self._minibatch_size,
-                             datasets = self._feature_image_datasets)
+                             datasets = self._feature_image_datasets,
+                             fvec_whitten = self._fvec_whitten,
+                             fvec_whitten_stats = self._fvec_whitten_stats)
 

@@ -86,13 +86,16 @@ class Samples(object):
                              (time.time()-t0, self.totalSamples))
             sys.stdout.flush()
 
+    def numOutputs(self):
+        return np.max(self.allLabels)
+
     def shuffle(self):
         perm=np.arange(self.totalSamples)
         np.random.shuffle(perm)
         self.allSamples = self.allSamples[perm]
         self.allLabels = self.allLabels[perm]
         self.allFeatureVector = self.allFeatureVector[perm]
-        
+
     def split(self, fractions, batchsize):
         assert np.sum(np.array(fractions)) <=1.0
         subSampleList = []
