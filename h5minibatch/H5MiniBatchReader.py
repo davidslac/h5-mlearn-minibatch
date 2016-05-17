@@ -49,8 +49,8 @@ class H5MiniBatchReader(object):
                      label_dataset,
                      datasets_for_feature_vector=[],
                      feature_image_datasets=[],
-                     fvec_whitten=False,
-                     fvec_whitten_fname=None,
+                     fvec_preprocess=None,
+                     fvec_preprocess_fname=None,
                      fvec_dtype = 'float32',
                      minibatch_size=64,
                      validation_size_fraction=0.05,                
@@ -60,14 +60,14 @@ class H5MiniBatchReader(object):
         self._label_dataset = label_dataset
         self._datasets_for_feature_vector = datasets_for_feature_vector
         self._feature_image_datasets = feature_image_datasets
-        self._fvec_whitten = fvec_whitten
-        self._fvec_whitten_fname = fvec_whitten_fname
+        self._fvec_preprocess = fvec_preprocess
+        self._fvec_preprocess_fname = fvec_preprocess_fname
         self._fvec_dtype = str2np_dtype(fvec_dtype)
         self._minibatch_size = minibatch_size
         self._validation_size_fraction = validation_size_fraction
         self._test_size_fraction = test_size_fraction
 
-        self._fvec_whitten_stats = None
+        self._fvec_preprocess_stats = None
 
         if random_seed is not None:
             np.random.seed(random_seed)
@@ -87,12 +87,13 @@ class H5MiniBatchReader(object):
         self.samples = {}
         self.samples['test'], self.samples['validation'], self.samples['train'] = sampleList
 
-        if self._fvec_whitten:
-            if not os.path.exists(self._fvec_whitten_fname):
+        if self._fvec_preprocess:
+            assert self._fvec_preprocess in ['whiten', 'clip']
+            if not os.path.expandvars(os.path.expanduser(self._fvec_preprocess_fname)):
                 self.samples['train'].fvecStats(self._verbose, 
-                                                self._fvec_whitten_fname)
-            self._fvec_whitten_stats = loadFvecStats(self._fvec_whitten_fname)
-                                                            
+                                                self._fvec_preprocess_fname)
+            self._fvec_preprocess_stats = loadFvecStats(self._fvec_preprocess_fname)
+
     def image_dataset_shapes(self):
         shapes = {}
         for nm in self._feature_image_datasets:
@@ -118,6 +119,6 @@ class H5MiniBatchReader(object):
                              batchLimit=batchLimit,
                              batchsize = self._minibatch_size,
                              datasets = self._feature_image_datasets,
-                             fvec_whitten = self._fvec_whitten,
-                             fvec_whitten_stats = self._fvec_whitten_stats)
+                             fvec_preprocess = self._fvec_preprocess,
+                             fvec_preprocess_stats = self._fvec_preprocess_stats)
 

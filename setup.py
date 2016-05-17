@@ -1,4 +1,6 @@
 from setuptools import setup, find_packages
+from Cython.Build import cythonize
+
 # To use a consistent encoding
 from codecs import open
 from os import path
@@ -15,6 +17,7 @@ setup(
     description='package to prepare minibatches from h5 input for a machine learning framework.',
     long_description=long_description,
     url='https://github.com/davidslac/h5-mlearn-minibatch',
+#    ext_modules= cythonize(path.join(here,'pyext','main.pyx')),
     author='David Schneider',
     author_email='davidsch@slac.stanford.edu',
     license='Stanford',

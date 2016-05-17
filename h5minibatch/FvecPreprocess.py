@@ -8,6 +8,8 @@ def loadFvecStats(fname):
     ARGS:
       fname - name of h5 file to write/read stats from
     '''
+    fname = os.path.expandvars(os.path.expanduser(fname))
+    assert os.path.exists(fname)
     h5 = h5py.File(fname,'r')
     fvecstats = {}
     for ky in h5.keys(): 
@@ -16,11 +18,12 @@ def loadFvecStats(fname):
     return fvecstats
 
 
-def preprocessFvecBatch(fvec, fvecstats, datasets_for_feature_vector, eps=1e-6):
+def preprocessFvecBatch(fvec, preprocess, fvecstats, datasets_for_feature_vector, eps=1e-6):
     '''whiten a batch of feature vectors
     ARGS:
       fvec - batch of features, a 2D numpy array of a numeric type, each column 
              corresponds to a name in the datasets_for_feature_vector list
+      preprocess - what to do
       datasets_for_feature_vector - list of feature names, one for each column
                                     of fvec
       fvecstats - dictionary for all bld stats, could be more than whats in 
@@ -33,10 +36,14 @@ def preprocessFvecBatch(fvec, fvecstats, datasets_for_feature_vector, eps=1e-6):
      whittened fvec
     '''
     assert fvec.shape[1]==len(datasets_for_feature_vector)
-    fvecWhittened = np.zeros(fvec.shape, fvec.dtype)
+    fvecPreprocessed = np.zeros(fvec.shape, fvec.dtype)
     for idx, nm in enumerate(datasets_for_feature_vector):
         mean = fvecstats['%s:mean'%nm]
         stddev = fvecstats['%s:std' % nm]
-        fvecWhittened[:,idx] = (fvec[:,idx]-mean)/(eps+stddev)
-    return fvecWhittened
+        centered = fvec[:,idx] - mean
+        if preprocess == 'clip':
+            centered = np.maximum(mean - 3*stddev, centered)
+            centered = np.minimum(mean + 3*stddev, centered)
+        fvecPreprocessed[:,idx] = centered/(eps+stddev)
+    return fvecPreprocessed
 

@@ -15,8 +15,8 @@ class BatchIterator(object):
                  batchLimit,
                  batchsize,
                  datasets,
-                 fvec_whitten=False,
-                 fvec_whitten_stats=None):
+                 fvec_preprocess=None,
+                 fvec_preprocess_stats=None):
         
         assert samples.totalSamples % batchsize == 0
         self.totalEpochs=epochs
@@ -24,8 +24,8 @@ class BatchIterator(object):
         self.batchsize=batchsize
         self.samples=samples
         self.datasets=datasets
-        self.fvec_whitten = fvec_whitten
-        self.fvec_whitten_stats = fvec_whitten_stats
+        self.fvec_preprocess = fvec_preprocess
+        self.fvec_preprocess_stats = fvec_preprocess_stats
 
         self.curEpoch=0
         self.nextSampleIdx=0
@@ -54,8 +54,9 @@ class BatchIterator(object):
             raise StopIteration()
 
         fvec = self.samples.allFeatureVector[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)]
-        if self.fvec_whitten:
-            fvec = preprocessFvecBatch(fvec, self.fvec_whitten_stats, self.samples.fvec_datasets)
+        if self.fvec_preprocess:
+            assert self.fvec_preprocess in ['clip', 'whitten']
+            fvec = preprocessFvecBatch(fvec, self.fvec_preprocess, self.fvec_preprocess_stats, self.samples.fvec_datasets)
 
         batchDict = {'epoch':self.curEpoch,
                      'batch':self.nextSampleIdx//self.batchsize,
@@ -63,6 +64,7 @@ class BatchIterator(object):
                      'labels':self.samples.allLabels[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)],
                      'filesRows':self.samples.allSamples[self.nextSampleIdx:(self.nextSampleIdx+self.batchsize)],
                      'readtime':self._batchReadTime,
+                     'size':self.batchsize,
                      'datasets':{},
         }
         for nm in self.datasets:
