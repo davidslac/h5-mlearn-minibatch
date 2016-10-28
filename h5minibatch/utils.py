@@ -22,6 +22,8 @@ def str2np_dtype(dtypestr):
     return _str2np[dtypestr]
 
 def makeMask(h5, exclude_if_negone_mask_datasets=[], include_if_one_mask_datasets=[]):
+    if isinstance(h5, str):
+        h5 = h5py.File(h5,'r')
     mask = None
 
     for maskList, maskVal in zip([exclude_if_negone_mask_datasets,
@@ -171,24 +173,3 @@ def load_features_and_labels(dataset,
     features = apply_preprocess_steps(features, preprocess)
     return features, labels
 
-def apply_preprocess_steps(arr, preprocess_steps):
-    '''This can be descructive to the array passed in, but still use as
-    arr = apply_preprocess(arr,['log', 'mean'])
-    '''
-    if preprocess_steps is None:
-        return arr
-    for step in preprocess_steps:
-        assert step in ['float32', 'float64', 'log', 'mean']
-        if (step in ['log','mean']) and (not np.issubdtype(arr.dtype, np.float)):
-            arr = arr.astype(np.float32)
-        if step == 'float32':
-            arr = arr.astype(np.float32)
-        elif step == 'float64':
-            arr = arr.astype(np.float64)
-        elif step == 'log':
-            arr[arr < 1.0]=1.0
-            arr = np.log(arr)
-        elif step == 'mean':
-            mean = np.mean(arr, axis=0)
-            arr -= mean
-    return arr
